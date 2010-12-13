@@ -1,0 +1,448 @@
+<?php
+// $Id$
+/**
+ * Status:
+ *    Import:
+ *        - working
+      Views Integration
+          - started basic views integration
+          - 
+
+/**
+ * Implementation of hook_menu().
+ */
+function unfuddle_api_import_menu() {
+  $items = array();
+
+  $items['admin/settings/unfuddle_api_import'] = array(
+    'title' => 'Unfuddle API Import',
+    'description' => 'Get info from Unfuddle',
+    'access arguments' => array('administer unfuddle api configuration'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('unfuddle_api_import_cron_form'),
+    'file' => 'unfuddle_api_import.admin.inc',
+    'type' => MENU_NORMAL_ITEM,
+  );
+  $items['admin/settings/unfuddle_api_import/clients'] = array(
+    'title' => 'Cron Settings',
+    'description' => 'Get info from Unfuddle',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+  );
+  $items['admin/settings/unfuddle_api_import/import_now'] = array(
+    'title' => 'Import Now',
+    'description' => 'Import tickets and time entries now',
+    'access arguments' => array('administer unfuddle api configuration'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('unfuddle_api_import_now_form'),
+    'file' => 'unfuddle_api_import.admin.inc',
+    'type' => MENU_LOCAL_TASK,
+  );
+  return $items;
+
+}
+
+/**
+ * Implementation of hook_views_api().
+ */
+function unfuddle_api_import_views_api() {
+  return array(
+    'api' => 2,
+  );
+}
+
+
+
+/**
+ *  Return list of active projects.
+ */
+function unfuddle_api_import_projects_active() {
+    $unfuddle = unfuddle_api_create();    
+    $projects = $unfuddle->getProjects();
+    $count = count($projects); 
+    $i=0;
+    while ($i < $count) {
+      if($projects[$i]['archived'] != TRUE) {
+        $active_projects[$projects[$i]['id']] = $projects[$i]['title'];
+      }
+      $i++;
+    }
+    $project_links = theme('item_list', $project_link, 'Clients');
+    return $active_projects;
+}
+
+/**
+ * Setup batch operation.
+ */
+function unfuddle_api_import_import_elements($project_ids) {
+  
+  $batch = array(
+    'title' => t('Importing Project Data'),
+    'init_message' => t('Commencing'),
+    'progress_message' => t('Importing element @current out of @total.'),
+    'finished' => 'unfuddle_api_import_batch_finished',
+  );
+  foreach ($project_ids as $project_id) {
+    $batch['operations'][] = array('_unfuddle_api_import_tickets_batch_read', array($project_id)); 
+    $batch['operations'][] = array('_unfuddle_api_import_time_batch_read', array($project_id)); 
+    $batch['operations'][] = array('_unfuddle_api_import_people_batch_read', array($project_id)); 
+    $batch['operations'][] = array('_unfuddle_api_import_project_batch_read', array($project_id)); 
+    $batch['operations'][] = array('_unfuddle_api_import_milestones_batch_read', array($project_id)); 
+    $batch['operations'][] = array('_unfuddle_api_import_components_batch_read', array($project_id)); 
+  }
+ 
+  batch_set($batch);
+
+  batch_process('admin/settings/unfuddle_api_import');
+}
+
+/**
+ * Batch import for tickets
+ */
+function _unfuddle_api_import_tickets_batch_read($project_id, &$context) {
+  set_time_limit(0);
+
+  // The sandbox is not persistant between operations so we can use to reset for next project.
+  if (is_null($context['sandbox']['tickets'])) {
+    $unfuddle = unfuddle_api_create();
+    $context['sandbox']['tickets'] = $unfuddle->getTickets($project_id);
+    $context['results']['ticket_imported'] = 0;
+
+    // Delete previous tickets from this project
+    db_query("DELETE FROM {unfuddle_api_import_tickets} WHERE project_id = '%d' OR project_id = '0'", $project_id);
+  }
+
+  //get the total lines
+  $context['total'] = count($context['sandbox']['tickets']);
+
+  // define batch limit
+  $batch_limit = 15;
+
+  // assume the batch process has not completed
+  $context['finished'] = 0;
+
+  // loop through the file and stop at batch limit
+  for ($i = 0; $i < $batch_limit; $i++) {
+    $ticket = $context['sandbox']['tickets'][$context['results']['ticket_imported']];
+    if (is_null($context['results']['ticket_imported'])) {
+         $context['results']['ticket_imported'] = 0;
+    }
+    if ($ticket) {
+      db_query("INSERT INTO {unfuddle_api_import_tickets} 
+             (resolution_description, reporter_id, created_at, resolution_description_format, priority, hours_estimate_intial, assignee_id, number, description_format, description, project_id, hours_estimate_current, status, resolution, component_id, summary, version_id, updated_at, id, due_on, severity_id, milestone_id) 
+             VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')", 
+             $ticket['resolution_description'], 
+             $ticket['reporter_id'], 
+             strtotime($ticket['created_at']), 
+             $ticket['resolution_description_format'], 
+             $ticket['priority'], 
+             $ticket['hours_estimate_intial'], 
+             $ticket['assignee_id'], 
+             $ticket['number'], 
+             $ticket['description_format'], 
+             $ticket['description'], 
+             $ticket['project_id'], 
+             $ticket['hours_estimate_current'], 
+             $ticket['status'], 
+             $ticket['resolution'], 
+             $ticket['component_id'], 
+             $ticket['summary'], 
+             $ticket['version_id'], 
+             $ticket['updated_at'], 
+             $ticket['id'], 
+             $ticket['due_on'], 
+             $ticket['severity_id'], 
+             $ticket['milestone_id']);
+    }
+    $context['message'] = t('Processing ticket @count out of @total.', array('@count' => $context['results']['ticket_imported'], '@total' => $context['total']));
+
+    if ($context['results']['ticket_imported'] >= $context['total']) {
+      // complete the batch process
+      $context['finished'] = 1;
+      // end loop
+      $i = $batch_limit;
+    }
+    // let the bar know how far we've come
+    $context['finished'] = $context['results']['ticket_imported']  / $context['total'];
+    $context['results']['ticket_imported']++;
+  }
+}
+
+/**
+ * Bactch import for time entries
+ */
+function _unfuddle_api_import_time_batch_read($project_id, &$context) {
+  $unfuddle = unfuddle_api_create();
+  set_time_limit(0);
+
+  // The sandbox is not persistant between operations so we can use to reset for next project.
+  if (is_null($context['sandbox']['tickets'])) {
+    $context['sandbox']['tickets'] = $unfuddle->getTickets($project_id);
+    $context['results']['time_imported'] = 0;
+
+    // Delete time entries from this project
+    $results = db_query("SELECT id FROM {unfuddle_api_import_tickets} WHERE project_id = '%d'", $project_id);
+    while ($tix = db_fetch_array($results)) {
+      db_query("DELETE FROM {unfuddle_api_import_time} WHERE ticket_id = '%d'", $tix['id']);
+    }
+  }
+
+  //get the total lines
+  $context['total'] = count($context['sandbox']['tickets']);
+
+  // define batch limit
+  $batch_limit = 50;
+
+  // assume the batch process has not completed
+  $context['finished'] = 0;
+
+  // loop through the file and stop at batch limit
+  for ($i = 0; $i < $batch_limit; $i++) {
+    if (is_null($context['results']['time_imported'])) {
+      $context['results']['time_imported'] = 0;
+    }
+    $project_id = $context['sandbox']['tickets'][$context['results']['time_imported']]['project_id'];
+    $ticket_id =  $context['sandbox']['tickets'][$context['results']['time_imported']]['id'];
+    $time_entries = $unfuddle->getTimeByTicket($project_id, $ticket_id);
+
+    if ($time_entries) {
+      foreach ($time_entries as $key => $entry) {
+        $date = strtotime($entry['date']);
+        db_query("INSERT INTO {unfuddle_api_import_time} 
+               (person_id, created_at, ticket_id, description, date, hours, updated_at, id) 
+               VALUES ('%d', '%s', '%d', '%s', '%s', '%s', '%d', '%d')", 
+               $entry['person_id'], 
+               strtotime($entry['created_at']), 
+               $entry['ticket_id'], 
+               $entry['description'], 
+               $date, 
+               $entry['hours'], 
+               $entry['updated_at'], 
+               $entry['id']);
+      }
+      $date = NULL;
+    }
+    $context['message'] = t('Processing time from ticket @count out of @total.', array('@count' => $context['results']['time_imported'], '@total' => $context['total']));
+
+    if ($context['results']['time_imported'] == $context['total']) {
+      // complete the batch process
+      $context['finished'] = 1;
+    
+      // end loop
+      $i = $batch_limit;
+    }
+
+    // let the bar know how far we've come
+    $context['finished'] = $context['results']['time_imported']  / $context['total'];
+    $context['results']['time_imported']++;
+  }
+}
+
+/**
+ * Bactch import for people. This has update 
+ */
+function _unfuddle_api_import_people_batch_read($project_id, &$context) {
+  set_time_limit(0);
+
+  // The sandbox is not persistant between operations so we can use to reset for next project.
+  if (is_null($context['sandbox']['people'])) {
+    $unfuddle = unfuddle_api_create();
+    $context['sandbox']['people'] = $unfuddle->getProjectPeople($project_id);    
+    $context['results']['people_imported'] = 0;
+  }
+
+  //get the total lines
+  $context['total'] = count($context['sandbox']['people']);
+
+  // define batch limit
+  $batch_limit = 25;
+
+  // assume the batch process has not completed
+  $context['finished'] = 0;
+
+  // loop through the file and stop at batch limit
+  for ($i = 0; $i < $batch_limit; $i++) {
+    $update = '';
+    $person = $context['sandbox']['people'][$i];
+    // Delete existing records of people.
+    db_query("DELETE FROM {unfuddle_api_import_people} WHERE id = '%d'", $person['id']); 
+    // Add people.
+    db_query("INSERT INTO {unfuddle_api_import_people} 
+               (first_name, last_name, email, id, is_administrator, is_removed) 
+               VALUES ('%s', '%s', '%s', '%d', '%d', '%d')", 
+               $person['first_name'], $person['last_name'], $person['email'], $person['id'], $person['is_administrator'], $person['is_removed']);
+    $context['message'] = t('Processing person @count out of @total.', array('@count' => $context['results']['people_imported'], '@total' => $context['total']));
+
+    // let the bar know how far we've come
+    $context['finished'] = $context['results']['people_imported']  / $context['total'];
+    $context['results']['people_imported']++;
+
+    if ($context['results']['people_imported'] == $context['total']) {
+      // complete the batch process
+      $context['finished'] = 1;
+    
+      // end loop
+      $i = $batch_limit;
+    }
+
+  }
+}
+
+/**
+ * Bactch import for project.
+ */
+function _unfuddle_api_import_project_batch_read($project_id, &$context) {
+  $unfuddle = unfuddle_api_create();
+
+  $project = $unfuddle->getProject($project_id);    
+
+  // Delete time entries from this project
+  $results = db_query("DELETE FROM {unfuddle_api_import_projects} WHERE id = '%d'", $project_id);
+
+  db_query("INSERT INTO {unfuddle_api_import_projects} 
+           (short_name, archived, title, description, updated_at, account_id, id) 
+            VALUES ('%s', '%d', '%s', '%s', '%s', '%d', '%d')", 
+            $project['short_name'], $project['archived'], $project['title'], $project['description'], $project['updated_at'], $project['account_id'], $project['id']);
+
+  $context['message'] = t('Processing project.');
+
+  $context['finished'] = 1;
+}
+
+/**
+ * Batch import for milestones
+ */
+function _unfuddle_api_import_milestones_batch_read($project_id, &$context) {
+  set_time_limit(0);
+
+  // The sandbox is not persistant between operations so we can use to reset for next project.
+  if (is_null($context['sandbox']['milestones'])) {
+    $unfuddle = unfuddle_api_create();
+    $context['sandbox']['milestones'] = $unfuddle->getMilestones($project_id);
+    $context['results']['milestones_imported'] = 0;
+
+    // Delete previous tickets from this project
+    db_query("DELETE FROM {unfuddle_api_import_milestones} WHERE project_id = '%d' OR project_id = '0'", $project_id);
+  }
+
+  // define batch limit
+  $batch_limit = 5;
+
+  // assume the batch process has not completed
+  $context['finished'] = 0;
+
+  //get the total lines
+  $context['total'] = count($context['sandbox']['milestones']);
+
+  if ($context['total']) {
+
+    // loop through the file and stop at batch limit
+    for ($i = 0; $i < $batch_limit; $i++) {
+      $milestone = $context['sandbox']['milestones'][$context['results']['milestones_imported']];
+      if (is_null($context['results']['milestones_imported'])) {
+        $context['results']['milestones_imported'] = 0;
+      }
+      db_query("INSERT INTO {unfuddle_api_import_milestones} 
+             (id, completed, archived, updated_at, due_on, project_id, title, person_responsible_id) 
+             VALUES ('%d', '%s', '%d', '%s', '%s', '%d', '%s', '%d')", 
+             $milestone['id'], 
+             $milestone['completed'], 
+             $milestone['archived'], 
+             $milestone['updated_at'], 
+             $milestone['due_on'], 
+             $milestone['project_id'], 
+             $milestone['title'], 
+             $milestone['person_responsible_id']);
+      $context['message'] = t('Processing ticket @count out of @total.', array('@count' => $context['results']['milestones_imported'], '@total' => $context['total']));
+
+      // let the bar know how far we've come
+      $context['finished'] = $context['results']['milestones_imported']  / $context['total'];
+      $context['results']['milestones_imported']++;
+
+      if ($context['results']['milestones_imported'] >= $context['total']) {
+        // complete the batch process
+        $context['finished'] = 1;
+
+        // end loop
+        $i = $batch_limit;
+      }
+    }
+  } 
+  else {
+    $context['finished'] = 1;
+  }
+}
+
+/**
+ * Batch import for components
+ */
+function _unfuddle_api_import_components_batch_read($project_id, &$context) {
+
+  // The sandbox is not persistant between operations so we can use to reset for next project.
+  if (is_null($context['sandbox']['components'])) {
+    $unfuddle = unfuddle_api_create();
+    $context['sandbox']['components'] = $unfuddle->getComponents($project_id);
+    $context['results']['components_imported'] = 0;
+
+    // Delete previous components from this project
+    db_query("DELETE FROM {unfuddle_api_import_components} WHERE project_id = '%d' OR project_id = '0'", $project_id);
+  }
+
+  // define batch limit
+  $batch_limit = 5;
+
+  // assume the batch process has not completed
+  $context['finished'] = 0;
+
+  //get the total lines
+  $context['total'] = count($context['sandbox']['components']);
+  if ($context['total']) {
+
+    // loop through the file and stop at batch limit
+    for ($i = 0; $i < $batch_limit; $i++) {
+      $component = $context['sandbox']['components'][$context['results']['components_imported']];
+      if (is_null($context['results']['components_imported'])) {
+         $context['results']['components_imported'] = 0;
+      }
+      db_query("INSERT INTO {unfuddle_api_import_components} 
+             (id, name, project_id) 
+             VALUES ('%d', '%s', '%d')", 
+             $component['id'], 
+             $component['name'], 
+             $component['project_id']); 
+      $context['message'] = t('Processing ticket @count out of @total.', array('@count' => $context['results']['components_imported'], '@total' => $context['total']));
+
+      // let the bar know how far we've come
+      $context['finished'] = $context['results']['components_imported']  / $context['total'];
+      $context['results']['components_imported']++;
+
+      if ($context['results']['components_imported'] >= $context['total']) {
+        // complete the batch process
+        $context['finished'] = 1;
+
+        // end loop
+        $i = $batch_limit;
+      }
+    }
+  }
+  else {
+    $context['finished'] = 1;
+  }
+}
+
+/**
+ * Finish batch process. The results are overwritten for each project so no data displayed.
+ */
+function unfuddle_api_import_batch_finished($success, $results, $operations) {
+  if ($success) {
+    $message = t('Projects processed!');
+  }
+  else {
+    $message = t('Finished with an error.');
+  }
+  drupal_set_message($message);
+  // Providing data for the redirected page is done through $_SESSION.
+  foreach ($results as $result) {
+    $items[] = t('Loaded node %title.', array('%title' => $result));
+  }
+  $_SESSION['my_batch_results'] = $items;
+}

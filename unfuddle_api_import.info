@@ -1,0 +1,8 @@
+; $id$
+
+name = Unfuddle API Import
+description = Imports data from Unfuddle using API 
+package = Unfuddle
+core = 6.x
+dependencies[] = unfuddle_api
+dependencies[] = drupal_queue

@@ -1,0 +1,400 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ *   Install file for unfuddle_api_import module.
+ */
+
+/**
+ * Implementation of hook_schema().
+ */
+function unfuddle_api_import_schema() {
+  $schema['unfuddle_api_import_projects'] = array(
+    'description' => 'Unfuddle Projects Table',
+    'fields' => array(
+      'short_name' => array(
+        'description' => 'The project short name.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => ''),
+      'archived' => array(
+        'description' => 'When the project was archived.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => ''),
+      'title' => array(
+        'description' => 'The project title.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => ''),
+      'description' => array(
+        'description' => 'The project description.',
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'big'),
+      'updated_at' => array(
+        'description' => 'When the project was updated.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => ''),
+      'account_id' => array(
+        'description' => 'The account id.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0),
+      'id' => array(
+        'description' => 'The project id.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0),
+      ),
+      'unique keys' => array(
+        'id'     => array('id'),
+      ), 
+      'primary key' => array('id'),
+  );
+  $schema['unfuddle_api_import_tickets'] = array(
+    'description' => 'Unfuddle Tickets Table',
+    'fields' => array(
+      'resolution_description' => array(
+        'description' => 'The resolution description.',
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'big'),
+      'reporter_id' => array(
+        'description' => 'The reporter id.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0),
+      'created_at' => array(
+        'description' => 'When the ticket was created.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => ''),
+      'resolution_description_format' => array(
+        'description' => 'Resolution description format.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => ''),
+      'priority' => array(
+        'description' => 'The ticket priority.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0),
+      'hours_estimate_intial' => array(
+        'description' => 'The project id.',
+        'type' => 'float',
+        'size' => 'small',
+        'not null' => TRUE,
+        'default' => 0),
+      'assignee_id' => array(
+        'description' => 'The assignee id.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0),
+      'number' => array(
+        'description' => 'The ticket number.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0),
+      'description_format' => array(
+        'description' => 'Description format.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => ''),
+      'description' => array(
+        'description' => 'The ticket description.',
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'big'),
+      'project_id' => array(
+        'description' => 'The assignee id.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0),
+      'hours_estimate_current' => array(
+        'description' => 'The current hours estimate.',
+        'type' => 'float',
+        'size' => 'small',
+        'not null' => TRUE,
+        'default' => 0),
+      'status' => array(
+        'description' => 'The ticket status.',
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'small'),
+      'resolution' => array(
+        'description' => 'The ticket resolution.',
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'big'),
+      'component_id' => array(
+        'description' => 'The component id.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0),
+      'summary' => array(
+        'description' => 'The ticket summary.',
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'small'),
+      'version_id' => array(
+        'description' => 'The version id.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0),
+      'updated_at' => array(
+        'description' => 'When the ticket was updated.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => ''),
+      'id' => array(
+        'description' => 'The ticket id.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0),
+      'due_on' => array(
+        'description' => 'When the ticket is due.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => ''),
+      'severity_id' => array(
+        'description' => 'The severity id.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0),
+      'milestone_id' => array(
+        'description' => 'The milestone id.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0),
+      ),
+      'unique keys' => array(
+        'id'     => array('id'),
+      ), 
+      'primary key' => array('id'),
+  );
+  $schema['unfuddle_api_import_time'] = array(
+    'description' => 'Unfuddle Time Table',
+    'fields' => array(
+      'person_id' => array(
+        'description' => 'The person id.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0),
+      'created_at' => array(
+        'description' => 'When the time entry was created.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => ''),
+      'ticket_id' => array(
+        'description' => 'The ticet id.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0),
+      'description' => array(
+        'description' => 'The time entry description.',
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'big'),
+      'date' => array(
+        'description' => 'The time entry date.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => ''),
+      'hours' => array(
+        'description' => 'The current hours.',
+        'type' => 'float',
+        'size' => 'small',
+        'not null' => TRUE,
+        'default' => 0),
+      'updated_at' => array(
+        'description' => 'When the time entry was updated.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => ''),
+      'id' => array(
+        'description' => 'The time entry id.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0),
+      ),
+      'unique keys' => array(
+        'id'     => array('id'),
+      ), 
+      'primary key' => array('id'),
+  );
+  $schema['unfuddle_api_import_people'] = array(
+    'description' => 'Unfuddle Reports People',
+    'fields' => array(
+      'first_name' => array(
+        'description' => t('The first name.'),
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'last_name' => array(
+        'description' => t('The last name.'),
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'email' => array(
+        'description' => t('The person\'s email address.'),
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'is_removed' => array(
+        'description' => 'Whether the person is removed.',
+        'type' => 'int',
+        'size' => 'tiny',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'is_administrator' => array(
+        'description' => 'Whether the person is an admin.',
+        'type' => 'int',
+        'size' => 'tiny',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'id' => array(
+        'description' => 'The person id.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0),
+      'project_id' => array(
+        'description' => 'The ticket id.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0),
+      ),
+      'unique keys' => array(
+        'id'     => array('id'),
+      ), 
+      'primary key' => array('id'),
+  );
+  $schema['unfuddle_api_import_components'] = array(
+    'description' => 'Unfuddle Components',
+    'fields' => array(
+      'name' => array(
+        'description' => t('The name.'),
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'id' => array(
+        'description' => t('The component id.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'project_id' => array(
+        'description' => t('The component label id.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+   ),
+    'primary key' => array('id'),
+  );
+  $schema['unfuddle_api_import_milestones'] = array(
+    'description' => 'Unfuddle Milestones',
+    'fields' => array(
+      'id' => array(
+        'description' => t('The milestone id.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'completed' => array(
+        'description' => t('Whether the milestone is completed.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+      ),
+      'archived' => array(
+        'description' => t('Whether it is archived.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+      ),
+      'updated_at' => array(
+        'description' => 'When the milestone was updated.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'due_on' => array(
+        'description' => 'When the milestone is due.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'project_id' => array(
+        'description' => 'The project id.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'title' => array(
+        'description' => t('The milestone title.'),
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'person_responsible_id' => array(
+        'description' => t('The person responsible id.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+      ),
+   ),
+    'primary key' => array('id'),
+  );
+  return $schema;
+}
+ 
+ /**
+ * Implementation of hook_install()
+ */
+function unfuddle_api_import_install() {
+  drupal_install_schema('unfuddle_api_import');
+}
+
+ /**
+ * Implementation of hook_uninstall().
+ */
+function unfuddle_api_import_uninstall() {
+  drupal_uninstall_schema('unfuddle_api_import');
+}
+
